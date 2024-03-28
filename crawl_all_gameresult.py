@@ -1,8 +1,7 @@
 import time as sleep
 
+import gspread
 import pandas as pd
-from gspread_pandas import Spread
-from oauth2client.service_account import ServiceAccountCredentials
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
@@ -14,7 +13,7 @@ driver = webdriver.Chrome(options=options)
 
 SEASON_KEY = "S43G01N"
 
-key_list = [f"{SEASON_KEY}{i}" for i in range(1, 2)]
+key_list = [f"{SEASON_KEY}{i}" for i in range(1, 271)]
 results = pd.DataFrame()
 
 for key in key_list:
@@ -60,31 +59,21 @@ results.columns = [col[0] if col[0] == col[1] else f"{col[0]} {col[1]}" for col 
 results.columns = [col.strip() for col in results.columns]
 results = results.rename(columns={"No": "Starting", "No No.1": "No"})
 results = results.query("Starting!='합계'").copy()
-results = results.set_index(["Starting", "No", "Name"])
 
-
-season = results["Date"].min() + "-" + results["Date"].max()
+season = results["Date"].str[:4].min() + "-" + results["Date"].str[:4].max()
 results["SEASON"] = season
+results = results.fillna("-")
 
-
-if True:  # results.shape[1] == 12 * 2 * 270:
+if results.shape[1] == 12 * 2 * 270:
     scope = [
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive",
     ]
     json_file_name = "ys-futsal-c94bf5ee6f76.json"
-    credentials = ServiceAccountCredentials.from_json_keyfile_name(
-        json_file_name,
-        scope,
-    )
-    spread = Spread(
-        "시즌별 전구단 기록",
-        creds=credentials,
-        create_sheet=season,
-    )
-    spread.df_to_sheet(
-        results,
-        index=True,
-        sheet=season,
-        start="B2",
-    )
+    gc = gspread.service_account(filename=json_file_name, scopes=scope)
+    sh = gc.open("시즌별 전구단 기록")
+    worksheets = [worksheet.title for worksheet in sh.worksheets()]
+    if season not in worksheets:
+        sh.add_worksheet(title=season, rows=results.shape[0] + 1, cols=results.shape[1] + 1)
+    worksheet = sh.worksheet(season)
+    worksheet.update([results.columns.values.tolist()] + results.values.tolist())

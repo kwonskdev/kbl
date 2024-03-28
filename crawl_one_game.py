@@ -1,9 +1,8 @@
 import time as sleep
 
+import gspread
 import pandas as pd
 from bs4 import BeautifulSoup
-from gspread_pandas import Spread
-from oauth2client.service_account import ServiceAccountCredentials
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
@@ -171,24 +170,17 @@ for q, idx in quarters.items():
                 records,
             ]
         )
+records = records.fillna("-")
 
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive",
 ]
 json_file_name = "ys-futsal-c94bf5ee6f76.json"
-credentials = ServiceAccountCredentials.from_json_keyfile_name(
-    json_file_name,
-    scope,
-)
-spread = Spread(
-    "농구 기록",
-    creds=credentials,
-    create_sheet=date,
-)
-spread.df_to_sheet(
-    records,
-    index=False,
-    sheet=date,
-    start="B2",
-)
+gc = gspread.service_account(filename=json_file_name, scopes=scope)
+sh = gc.open("농구 기록")
+worksheets = [worksheet.title for worksheet in sh.worksheets()]
+if date not in worksheets:
+    sh.add_worksheet(title=date, rows=records.shape[0] + 1, cols=records.shape[1] + 1)
+worksheet = sh.worksheet(date)
+worksheet.update([records.columns.values.tolist()] + records.values.tolist())
