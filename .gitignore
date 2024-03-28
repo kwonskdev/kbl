@@ -1,0 +1,4 @@
+*.ipynb
+__pycache__
+ys-futsal-c94bf5ee6f76.json
+.ipynb_checkpoints/
